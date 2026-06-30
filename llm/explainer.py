@@ -1,14 +1,39 @@
-from llm.prompts.explanation_prompt import build_explanation_prompt
+from llm.prompts.explanation_prompt import (
+    build_generation_explanation_prompt,
+    build_execution_explanation_prompt,
+)
 
 
 class QueryExplainer:
     def __init__(self, llm):
         self.llm = llm
 
-    def explain(self, user_input: str, query: str) -> str:
-        prompt = build_explanation_prompt(user_input, query)
+    def explain_generation(
+        self,
+        user_input: str,
+        query: str
+    ) -> str:
 
-        try:
-            return self.llm.generate(prompt).strip()
-        except:
-            return "This query retrieves data based on your request."
+        prompt = build_generation_explanation_prompt(
+            user_input,
+            query
+        )
+
+        return self.llm.generate(prompt).strip()
+
+    def explain_execution(
+        self,
+        user_input: str,
+        query: str,
+        row_count: int,
+        sample_results=None
+    ) -> str:
+
+        prompt = build_execution_explanation_prompt(
+            user_input,
+            query,
+            row_count,
+            sample_results
+        )
+
+        return self.llm.generate(prompt).strip()

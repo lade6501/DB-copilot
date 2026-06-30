@@ -1,9 +1,12 @@
+from http import client
 import os
 from typing import Optional, Dict, Any
 import json
 from dotenv import load_dotenv
 load_dotenv()
 
+from langchain_openai import ChatOpenAI
+import httpx
 from google import genai
 
 
@@ -15,7 +18,7 @@ class LLMProvider:
 class GeminiProvider(LLMProvider):
     def __init__(
         self,
-        model: str = "gemini-2.5-flash",
+        model: str = "gemini-3.1-flash-lite",
         temperature: float = 0.2,
         max_output_tokens: int = 2048,
     ):
@@ -66,9 +69,58 @@ RESPONSE:
         return prompt
 
 
+class OpenRouterProvider(LLMProvider):
+    def __init__(
+        self,
+        model: str = "openai/gpt-oss-120b:free",
+        temperature: float = 0.2,
+        max_output_tokens: int = 2048,
+    ):
+        api_key = os.getenv("OPENROUTER_API_KEY")
+        if not api_key:
+            raise ValueError("OPENROUTER_API_KEY not set")
+
+        self.api_key = api_key
+        self.model = model
+        self.temperature = temperature
+        self.max_output_tokens = max_output_tokens
+        self.client = httpx.Client(verify=False) 
+
+    def generate(
+        self,
+        prompt: str,
+        system_prompt: Optional[str] = None,
+    ) -> str:
+        
+        try:
+            llm = ChatOpenAI(
+                base_url="https://openrouter.ai/api/v1",
+                model=self.model,
+                api_key=self.api_key,
+                temperature=self.temperature,
+                http_client=self.client
+            )
+            response = llm.invoke(
+                [
+                    {"role": "system", "content": system_prompt or ""},
+                    {"role": "user", "content": prompt},
+                ]
+            )
+            print(f"Response from OpenRouter: {response.content}")  
+            return response.content.strip()
+            
+        except Exception as e:
+            raise RuntimeError(f"OpenRouter API error: {str(e)}")
+        
 class LLMFactory:
     @staticmethod
     def get_provider(provider: str = "gemini") -> LLMProvider:
-        if provider == "gemini":
-            return GeminiProvider()
-        raise ValueError(f"Unsupported provider: {provider}")
+        providers = {
+            "gemini": GeminiProvider,
+            "openrouter": OpenRouterProvider,
+        }
+
+        if provider not in providers:
+            raise ValueError(f"Unsupported provider: {provider}")
+
+        return providers[provider]()
